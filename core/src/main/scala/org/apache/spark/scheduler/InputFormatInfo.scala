@@ -40,7 +40,7 @@ class InputFormatInfo(val configuration: Configuration, val inputFormatClazz: Cl
 
   var mapreduceInputFormat: Boolean = false
   var mapredInputFormat: Boolean = false
-
+//set type
   validate()
 
   override def toString: String = {
@@ -69,6 +69,7 @@ class InputFormatInfo(val configuration: Configuration, val inputFormatClazz: Cl
     logDebug("validate InputFormatInfo : " + inputFormatClazz + ", path  " + path)
 
     try {
+      //judge class type
       if (classOf[org.apache.hadoop.mapreduce.InputFormat[_, _]].isAssignableFrom(
         inputFormatClazz)) {
         logDebug("inputformat is from mapreduce package")
@@ -79,6 +80,7 @@ class InputFormatInfo(val configuration: Configuration, val inputFormatClazz: Cl
         logDebug("inputformat is from mapred package")
         mapredInputFormat = true
       }
+        //error type
       else {
         throw new IllegalArgumentException("Specified inputformat " + inputFormatClazz +
           " is NOT a supported input format ? does not implement either of the supported hadoop " +
@@ -93,24 +95,25 @@ class InputFormatInfo(val configuration: Configuration, val inputFormatClazz: Cl
     }
   }
 
-
+//core function
   // This method does not expect failures, since validate has already passed ...
   private def prefLocsFromMapreduceInputFormat(): Set[SplitInfo] = {
     val conf = new JobConf(configuration)
+    //hadoop util and hadoop operation
     SparkHadoopUtil.get.addCredentials(conf)
     FileInputFormat.setInputPaths(conf, path)
-
+//java api: hadoop reflect
     val instance: org.apache.hadoop.mapreduce.InputFormat[_, _] =
       ReflectionUtils.newInstance(inputFormatClazz.asInstanceOf[Class[_]], conf).asInstanceOf[
         org.apache.hadoop.mapreduce.InputFormat[_, _]]
     val job = new Job(conf)
-
+//call getSplits from hadoop api
     val retval = new ArrayBuffer[SplitInfo]()
     val list = instance.getSplits(job)
     for (split <- list) {
+      //one split can be distributed on many locations
       retval ++= SplitInfo.toSplitInfo(inputFormatClazz, path, split)
     }
-
     retval.toSet
   }
 
@@ -168,18 +171,24 @@ object InputFormatInfo {
     PS: I know the wording here is weird, hopefully it makes some sense !
   */
   def computePreferredLocations(formats: Seq[InputFormatInfo]): Map[String, Set[SplitInfo]] = {
-
+//一系列Input文件。每个文件又分布在不同的机器上
     val nodeToSplit = new HashMap[String, HashSet[SplitInfo]]
     for (inputSplit <- formats) {
+      //allocate splits
       val splits = inputSplit.findPreferredLocations()
 
       for (split <- splits){
         val location = split.hostLocation
+        //update
         val set = nodeToSplit.getOrElseUpdate(location, new HashSet[SplitInfo])
         set += split
       }
     }
 
     nodeToSplit.mapValues(_.toSet).toMap
+
+    //then: {host1=>[input1(10),input2(9),input4(4)] host2=>[input2(len:2),input3(5),input4(9)] ... }
+    //相同下标表示同一个文件
+    //通过选择当前数据分布状况决定在哪台机器上启动task
   }
 }

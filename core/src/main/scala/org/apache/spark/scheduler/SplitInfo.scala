@@ -29,6 +29,7 @@ class SplitInfo(
     val hostLocation: String,
     val path: String,
     val length: Long,
+//??what is underlyingSplit
     val underlyingSplit: Any) {
   override def toString(): String = {
     "SplitInfo " + super.toString + " .. inputFormatClazz " + inputFormatClazz +
@@ -62,7 +63,7 @@ class SplitInfo(
 }
 
 object SplitInfo {
-
+//for reading from hadoop1
   def toSplitInfo(inputFormatClazz: Class[_], path: String,
                   mapredSplit: org.apache.hadoop.mapred.InputSplit): Seq[SplitInfo] = {
     val retval = new ArrayBuffer[SplitInfo]()
@@ -72,7 +73,7 @@ object SplitInfo {
     }
     retval
   }
-
+//for reading from hadoop2
   def toSplitInfo(inputFormatClazz: Class[_], path: String,
                   mapreduceSplit: org.apache.hadoop.mapreduce.InputSplit): Seq[SplitInfo] = {
     val retval = new ArrayBuffer[SplitInfo]()
